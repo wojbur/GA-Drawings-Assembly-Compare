@@ -1,4 +1,4 @@
-"""A tool used to search content of PFD files of steel construction General Arrangement drawings to find if all steel asseblies
+"""A tool used to search content of PFD files with steel construction General Arrangement drawings to find if all steel asseblies
 have corresponding assembly marks. The tool reads all text from GA drawings, searches for assembly marks and compares the results
 with list of given assembly drawings"""
 
@@ -25,6 +25,7 @@ class GaAssemblyCompare:
         # Define list of files to compare
         self.ga_dwgs = []
         self.assy_dwgs = []
+        self.log_txt = ""
 
         # Define main frames grid
         self.frame1 = tk.Frame(self.main, width=100, borderwidth=5)
@@ -59,29 +60,39 @@ class GaAssemblyCompare:
         self.button_compare = tk.Button(self.frame3, text='Compare marks \u279d', command=self.compare_drawings, width=21)
         self.button_compare.grid(row=0, column=0, columnspan=2)
 
+        self.button_compare = tk.Button(self.frame3, text='Save log file', command=self.save_log, width=21)
+        self.button_compare.grid(row=1, column=0, columnspan=2)
+
         # Define output text widget
         self.output_txt = st.ScrolledText(self.frame4, width=25, height=30)
         self.output_txt.grid(row=1, column=0, sticky=tk.NS)
-        self.output_txt.insert(tk.INSERT, "Assembly marks printed in white/invisible color will be treated as visible!")
-        self.output_txt.config(background='gray92', state='disabled', wrap='word')
+        self.output_txt.config(background='gray92', wrap='word')
+        self.display_message("Assembly marks printed in white/invisible color will be treated as visible!")
 
         # Define drop down menu to select assembly mark numbering pattern
         self.pattern = None
 
         self.dropdown_label = tk.Label(self.frame3, text='Fabricator:')
-        self.dropdown_label.grid(row=1, column=0, sticky=tk.W)
+        self.dropdown_label.grid(row=2, column=0, sticky=tk.W)
 
         self.fab_options = ['','ALM', 'BSC', 'TSC', 'CSS', 'other']
         self.fab = tk.StringVar()
         self.fab.set(self.fab_options[0])
 
         self.dropdown = tk.OptionMenu(self.frame3, self.fab, *self.fab_options, command=self.pattern_changed)
-        self.dropdown.grid(row=1, column=1, sticky=tk.E)
-
-        self.pattern_label = tk.Label(self.frame3)
-        self.pattern_label.grid(row=2, column=0, columnspan=2, sticky=tk.EW)
+        self.dropdown.grid(row=2, column=1, sticky=tk.E)
     
     # Define button functions
+    def display_message(self, message, clear_box=True):
+        """Displays given message in textbox"""
+        self.output_txt.config(state='normal')
+        if clear_box:
+            self.output_txt.delete('1.0', tk.END)
+        else:
+            self.output_txt.insert(tk.INSERT, "\n")
+        self.output_txt.insert(tk.INSERT, message)
+        self.output_txt.config(state='disabled')
+
 
     def pattern_changed(self, *args):
         """Change assembly numbering regex pattern to be used to find assembly marks on GA drawings"""
@@ -89,19 +100,19 @@ class GaAssemblyCompare:
             self.pattern_label['text'] = ''
             self.pattern = None
         elif self.fab.get() == 'ALM':
-            self.pattern_label['text'] = 'num pattern: 1B234'
+            self.display_message('Numbering pattern:\n1B234')
             self.pattern = re.compile(r'^\d+[A-Z]{1,3}\d+$')
         elif self.fab.get() == 'TSC':
-            self.pattern_label['text'] = 'num pattern: 1234B'
+            self.display_message('Numbering pattern:\n1234B')
             self.pattern = re.compile(r'^\d{3,5}[A-Z]{1,3}$')
         elif self.fab.get() == 'BSC':
-            self.pattern_label['text'] = 'num pattern: [G]1234'
+            self.display_message('Numbering pattern:\n[G]1234')
             self.pattern = re.compile(r'^G*\d{3,}$')
         elif self.fab.get() == 'CSS':
-            self.pattern_label['text'] = 'num pattern: 123B'
+            self.display_message('Numbering pattern:\n123B')
             self.pattern = re.compile(r'^\d+[A-Z]{1,3}$')
         elif self.fab.get() == 'other':
-            self.pattern_label['text'] = 'might find false positives'
+            self.display_message('Log file will not contain all assembly marks on GA drawings list')
             self.pattern = re.compile(r'^.+$')
 
     def select_assy_dwgs(self):
@@ -138,53 +149,78 @@ class GaAssemblyCompare:
         for file in files:
             lstbox.insert(tk.END, file[1])
     
+    def save_log(self):
+        """Save log file with list of missing assembly marks"""
+        if self.log_txt:
+            save_dir = Path(self.assy_dwgs[0][0]).parents[0]
+            file_dir = Path(save_dir, 'log.txt')
+            with open(file_dir, 'w') as f:
+                f.write(self.log_txt)
+            self.display_message(f'\nLog file saved:\n{file_dir}', clear_box=False)
+        else:
+            self.display_message('Nothing to save.\nRun "Compare marks" first.')
+
     def compare_drawings(self):
         """Compare content of all selected GA drawings with list of selected assembly drawings"""
-
         # Clear output text window
         self.output_txt.config(state='normal')
         self.output_txt.delete('1.0', tk.END)
 
+        # Clear out log string
+        self.log_txt = ""
+        log_string = ""
+
         # Display warnings
         if not self.assy_dwgs:
-            self.output_txt.insert(tk.INSERT, 'Select assembly drawings!')
-            self.output_txt.config(state='disabled')
+            self.display_message('Select assembly drawings!')
             return
         if not self.ga_dwgs:
-            self.output_txt.insert(tk.INSERT, 'Select GA drawings!')
-            self.output_txt.config(state='disabled')
+            self.display_message('Select GA drawings!')
             return
         if not self.pattern:
-            self.output_txt.insert(tk.INSERT, 'Select Fabricator!')
-            self.output_txt.config(state='disabled')
+            self.display_message('Select Fabricator!')
             return
 
         # Find all assembly marks matching given regex
         assy_on_ga = set()
         for dwg in self.ga_dwgs:
+            self.output_txt.insert(tk.INSERT, f'Searching {dwg[1]}...\n')
             reader = PdfReader(dwg[0])
             page = reader.pages[0]
-            self.output_txt.insert(tk.INSERT, f'Searching {dwg[1]}...\n')
             page_text = page.extract_text()
             page_lst = page_text.splitlines()
             page_assy_lst = {i for i in page_lst if self.pattern.match(i)}
             assy_on_ga.update(page_assy_lst)
-            self.main.update()
 
+            # Create log file containilg list of all assembly marks on GA drawings
+            if self.fab.get() != 'other':
+                log_string += f'\t{dwg[1]}:\n'
+                for i in sorted(list(page_assy_lst)):
+                    log_string += f'{i}\n'
+
+            self.main.update()
+            
         # Set of all assembly numbers from given assembly drawings
         assy = {i[1] for i in self.assy_dwgs}
 
         # Display result messages
         if assy.issubset(assy_on_ga):
-            self.output_txt.delete('1.0', tk.END)
-            self.output_txt.insert(tk.INSERT, "OK. All assemblies are shown on GA drawings.") 
+            self.log_txt += "OK. All assemblies are shown on GA drawings."
+            self.display_message("OK. All assemblies are shown on GA drawings.")
         else:
             assy_not_shown = sorted(list(assy - assy_on_ga))
             self.output_txt.delete('1.0', tk.END)
             self.output_txt.insert(tk.INSERT, "Missing assembly marks on GA drawings:")
+            self.log_txt += "\tMissing assembly marks on GA drawings:\n"
             for i in assy_not_shown:
                 self.output_txt.insert(tk.INSERT, f'\n{i}')
+                self.log_txt += f'{i}\n'
         self.output_txt.config(state='disabled')
+
+        # Add list of assembly marks on GA drawings to log file
+        if self.fab.get() != 'other':
+            self.log_txt += "\nAssembly marks shown on GA drawings:\n"
+            self.log_txt += log_string
 
 # Create app object
 app = GaAssemblyCompare(window)
