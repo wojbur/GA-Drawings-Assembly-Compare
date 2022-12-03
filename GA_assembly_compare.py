@@ -5,7 +5,6 @@ with list of given assembly drawings"""
 
 from PyPDF2 import PdfReader
 from pathlib import Path
-import glob
 import re
 import tkinter as tk
 import tkinter.filedialog as fd
@@ -106,23 +105,23 @@ class GaAssemblyCompare:
             self.assy_pattern = None
         elif self.fab.get() == 'ALM':
             self.display_message('Numbering pattern:\n1B234\nE-3.2.1')
-            self.assy_pattern = re.compile(r'^\d+[A-Z]{1,3}\d+$')
+            self.assy_pattern = re.compile(r'(\d+[A-Z]{1,3}\d+)')
             self.ga_pattern = re.compile(r'^E-\d{1,3}\.\d{1,3}\.\d{1,3}$')
         elif self.fab.get() == 'TSC':
             self.display_message('Numbering pattern:\n1234B\nE4321')
-            self.assy_pattern = re.compile(r'^\d{1,6}[A-Z]{1,3}$')
+            self.assy_pattern = re.compile(r'(\d{1,6}[A-Z]{1,3})')
             self.ga_pattern = re.compile(r'^[A-M]{1,2}\d{1,6}$')
         elif self.fab.get() == 'BSC':
             self.display_message('Numbering pattern:\n[G]1234\nE4321')
-            self.assy_pattern = re.compile(r'^G*\d{3,}$')
+            self.assy_pattern = re.compile(r'(G*\d{3,})')
             self.ga_pattern = re.compile(r'^(?!G)[A-Z]{1,2}\d{1,6}$')
         elif self.fab.get() == 'CSS':
             self.display_message('Numbering pattern:\n123B\nE-321')
-            self.assy_pattern = re.compile(r'^\d+[A-Z]{1,3}$')
+            self.assy_pattern = re.compile(r'(\d+[A-Z]{1,3})')
             self.ga_pattern = re.compile(r'^[A-Z]{1,2}-\d{1,4}$')
         elif self.fab.get() == 'other':
             self.display_message('Log file will not contain all assembly marks on GA drawings list')
-            self.assy_pattern = re.compile(r'^.+$')
+            self.assy_pattern = re.compile(r'(.+)')
 
     def select_assy_dwgs(self):
         """Empty assembly drawings list and listbox and populate with new selected files"""
@@ -234,8 +233,7 @@ class GaAssemblyCompare:
             reader = PdfReader(dwg[0])
             page = reader.pages[0]
             page_text = page.extract_text()
-            page_lst = page_text.splitlines()
-            page_assy_lst = {i for i in page_lst if self.assy_pattern.match(i)}
+            page_assy_lst = set(re.findall(self.assy_pattern, page_text))
             assy_on_ga.update(page_assy_lst)
 
             # Create log file containilg list of all assembly marks on GA drawings
