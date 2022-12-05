@@ -105,11 +105,11 @@ class GaAssemblyCompare:
             self.assy_pattern = None
         elif self.fab.get() == 'ALM':
             self.display_message('Numbering pattern:\n1B234\nE-3.2.1')
-            self.assy_pattern = re.compile(r'(\d+[A-Z]{1,3}\d+)')
+            self.assy_pattern = re.compile(r'(\d+(?![X])[A-Z]{1,3}\d+)')
             self.ga_pattern = re.compile(r'^E-\d{1,3}\.\d{1,3}\.\d{1,3}$')
         elif self.fab.get() == 'TSC':
             self.display_message('Numbering pattern:\n1234B\nE4321')
-            self.assy_pattern = re.compile(r'(\d{1,6}[A-Z]{1,3})')
+            self.assy_pattern = re.compile(r'(\d{1,6}(?![X])[A-Z]{1,3})')
             self.ga_pattern = re.compile(r'^[A-M]{1,2}\d{1,6}$')
         elif self.fab.get() == 'BSC':
             self.display_message('Numbering pattern:\n[G]1234\nE4321')
@@ -117,7 +117,7 @@ class GaAssemblyCompare:
             self.ga_pattern = re.compile(r'^(?!G)[A-Z]{1,2}\d{1,6}$')
         elif self.fab.get() == 'CSS':
             self.display_message('Numbering pattern:\n123B\nE-321')
-            self.assy_pattern = re.compile(r'(\d+[A-Z]{1,3})')
+            self.assy_pattern = re.compile(r'(\d+(?![X])[A-Z]{1,3})')
             self.ga_pattern = re.compile(r'^[A-Z]{1,2}-\d{1,4}$')
         elif self.fab.get() == 'other':
             self.display_message('Log file will not contain all assembly marks on GA drawings list')
